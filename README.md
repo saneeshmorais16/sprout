@@ -1,4 +1,4 @@
-# GROW
+# Sprout
 
 **Financial confidence that grows with you.**
 
