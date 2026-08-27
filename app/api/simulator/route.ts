@@ -1,0 +1,9 @@
+import {NextResponse} from "next/server";
+import {currentUser} from "@/lib/auth";
+import {db} from "@/lib/db";
+import {awardXp,grantAchievement} from "@/lib/rewards";
+import {projectSimulation} from "@/lib/simulator";
+import {sameOrigin} from "@/lib/security";
+import {simulatorSchema} from "@/lib/validation";
+export async function GET(){const user=await currentUser();if(!user)return NextResponse.json({error:"Sign in required."},{status:401});const sessions=await db.simulatorSession.findMany({where:{userId:user.id},orderBy:{createdAt:"desc"},take:8});return NextResponse.json({sessions});}
+export async function POST(request:Request){if(!sameOrigin(request))return NextResponse.json({error:"Request rejected."},{status:403});const user=await currentUser();if(!user?.profile?.ageGroup)return NextResponse.json({error:"Sign in required."},{status:401});const parsed=simulatorSchema.safeParse(await request.json().catch(()=>null));if(!parsed.success)return NextResponse.json({error:"Check the simulation inputs."},{status:400});const result=projectSimulation(parsed.data);const saved=await db.$transaction(async tx=>{const session=await tx.simulatorSession.create({data:{userId:user.id,name:user.profile!.ageGroup==="YOUTH"?"Growth Playground":"Long-term projection",inputs:JSON.stringify(parsed.data),results:JSON.stringify(result.final)}});await tx.activity.create({data:{userId:user.id,type:"SIMULATOR_COMPLETED",metadata:JSON.stringify({sessionId:session.id,educational:true})}});await grantAchievement(tx,user.id,"growth-explorer");const xpAwarded=await awardXp(tx,{userId:user.id,sourceType:"SIMULATOR",sourceId:"COMPOUND_GROWTH_INTRO",amount:50,currentTopic:"Compound growth"});return{session,xpAwarded}});return NextResponse.json({session:saved.session,result,xpAwarded:saved.xpAwarded},{status:201});}

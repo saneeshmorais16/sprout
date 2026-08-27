@@ -1,0 +1,5 @@
+"use client";
+import { useState } from "react";
+import { Check, LoaderCircle, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
+export function VideoCompletion({id,complete}:{id:string;complete:boolean}){const[done,setDone]=useState(complete);const[busy,setBusy]=useState(false);const[earned,setEarned]=useState(0);const[error,setError]=useState("");async function mark(){setBusy(true);const response=await fetch(`/api/videos/${id}/complete`,{method:"POST"});const data=await response.json();if(response.ok){setDone(true);setEarned(data.xpAwarded)}else setError(data.error||"Progress could not be saved.");setBusy(false)}return <div className="video-completion">{done?<div className="completion-banner"><Sparkles/><div><small>{earned?`+${earned} XP EARNED`:"VIDEO COMPLETE"}</small><strong>Added to your learning progress</strong></div><Check/></div>:<Button onClick={mark} disabled={busy}>{busy?<><LoaderCircle className="spin"/>Saving…</>:<>Mark complete · +50 XP <Check/></>}</Button>}{error&&<p className="inline-error">{error}</p>}</div>}

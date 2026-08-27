@@ -1,0 +1,2 @@
+import { ResetForm } from "@/components/reset-form";
+export default async function ResetPage({ searchParams }: { searchParams: Promise<{ token?: string }> }) { const { token = "" } = await searchParams; return <section className="auth-content"><span className="step-kicker">Choose a new password</span><h1>Secure your account</h1><p>Your reset link is single-use and expires after one hour.</p><ResetForm token={token}/></section>; }

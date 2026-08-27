@@ -1,0 +1,20 @@
+"use client";
+import {useState} from "react";
+import {ArrowRight,Check,Lightbulb,LoaderCircle,RefreshCw,Sparkles} from "lucide-react";
+import {Button} from "@/components/ui/button";
+import {DecisionReflection,type ReflectionKey} from "@/components/decision-reflection";
+import {GrowMascot} from "@/components/grow-mascot";
+import type {DecisionScenario} from "@/lib/decision-lab";
+import {growLoopStages} from "@/lib/grow-loop";
+
+type Result={option:{id:string;label:string;note:string};metrics:{label:string;value:string}[];whatHappened:string;whyItHappened:string;keyTakeaway:string};
+const reflectionKeys:Record<string,ReflectionKey>={saving:"SAVING_DECISION",subscriptions:"SUBSCRIPTION_DECISION","first-pay":"FIRST_PAY_DECISION","emergency-fund":"EMERGENCY_FUND_DECISION",credit:"CREDIT_DECISION",pension:"PENSION_DECISION"};
+
+export function GrowDecisionLab({scenario}:{scenario:DecisionScenario}){
+  const[stage,setStage]=useState<"LEARN"|"DECIDE"|"RESULT">("LEARN");const[selected,setSelected]=useState("");const[result,setResult]=useState<Result|null>(null);const[sessionId,setSessionId]=useState("");const[xp,setXp]=useState(0);const[busy,setBusy]=useState(false);const[error,setError]=useState("");const active=stage==="LEARN"?0:stage==="DECIDE"?1:4;
+  async function run(){if(!selected)return;setBusy(true);setError("");const response=await fetch(`/api/practice/decisions/${scenario.topicKey}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({optionId:selected})});const body=await response.json();if(response.ok){setResult(body.result);setSessionId(body.sessionId);setXp(body.xpAwarded||0);setStage("RESULT")}else setError(body.error||"The fictional consequence could not be calculated.");setBusy(false)}
+  function restart(){setStage("LEARN");setSelected("");setResult(null);setSessionId("");setXp(0)}
+  return <div className="decision-lab"><ol className="grow-loop-progress" aria-label="GROW practice loop">{growLoopStages.map((item,index)=><li key={item.key} className={index<=active?"active":""}><i>{index<active?<Check/>:index+1}</i><span>{item.label}</span></li>)}</ol>
+  {stage==="LEARN"?<section className="decision-learn"><Lightbulb/><span>LEARN IT</span><h2>{scenario.title}</h2><p>{scenario.learn}</p><div><strong>Fictional situation</strong>{scenario.context}</div><Button onClick={()=>setStage("DECIDE")}>Make a decision <ArrowRight/></Button></section>:stage==="DECIDE"?<section className="decision-choose"><span>DECIDE</span><h2>{scenario.prompt}</h2><p>Choose what you would explore. There is no universal correct answer.</p><div>{scenario.options.map(option=><button key={option.id} className={selected===option.id?"selected":""} onClick={()=>setSelected(option.id)} aria-pressed={selected===option.id}><i>{selected===option.id?<Check/>:String.fromCharCode(65+scenario.options.indexOf(option))}</i><strong>{option.label}</strong><small>{option.note}</small></button>)}</div>{error&&<p className="inline-error" role="alert">{error}</p>}<Button disabled={!selected||busy} onClick={run}>{busy?<LoaderCircle className="spin"/>:<Sparkles/>}{busy?"Calculating…":"See what happens"}</Button></section>:result?<section className="decision-result"><header><div><span>SIMULATED CONSEQUENCE</span><h2>{result.whatHappened}</h2></div><button onClick={restart} aria-label="Restart decision"><RefreshCw/></button></header><div className="decision-metrics">{result.metrics.map(metric=><div key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong></div>)}</div><section className="grow-explanation"><GrowMascot compact state="thinking"/><div><span>SPROUT EXPLAINS</span><h3>Why did it happen?</h3><p>{result.whyItHappened}</p><h3>Key takeaway</h3><p>{result.keyTakeaway}</p></div></section>{xp>0&&<div className="learning-reward"><Sparkles/><p><strong>+{xp} XP for exploring the decision</strong>XP is never based on the financial outcome.</p></div>}<DecisionReflection activityKey={reflectionKeys[scenario.topicKey]} decisionSessionId={sessionId}/></section>:null}</div>
+}
+

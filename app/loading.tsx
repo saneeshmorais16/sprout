@@ -1,0 +1,2 @@
+import { Brand } from "@/components/brand";
+export default function Loading(){return <main className="product-page youth-surface"><div className="mobile-shell dashboard-shell skeleton-shell" aria-busy="true" aria-label="Loading GROW"><header><Brand/><span className="skeleton-line short"/></header><div className="skeleton-line eyebrow"/><div className="skeleton-line title"/><div className="skeleton-card hero"/><div className="skeleton-line section"/><div className="skeleton-card"/><div className="skeleton-card small"/></div></main>}

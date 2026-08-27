@@ -1,0 +1,6 @@
+"use client";
+import { useState } from "react";
+import Link from "next/link";
+import { ArrowRight, ChevronDown, Eye, SlidersHorizontal, Sparkles } from "lucide-react";
+type Item={id:string;title:string;summary:string;category:string;reason:string;actionPath:string};
+export function FeedCards({items,adult}:{items:Item[];adult:boolean}){const[hidden,setHidden]=useState<string[]>([]);async function skip(id:string,category:string){setHidden([...hidden,id]);if(adult&&category==="Investing Basics")await fetch("/api/profile/content-signal",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({signal:"SKIP_ADVANCED"})})}return <div className="feed-list">{items.filter(item=>!hidden.includes(item.id)).map((item,index)=><article className={`feed-card tone-${index%4}`} key={item.id}><header><span>{item.category}</span><Sparkles/></header><h2>{item.title}</h2><p>{item.summary}</p><Link href={item.actionPath}>Try this <ArrowRight/></Link><details><summary><span><Eye/> Why am I seeing this?</span><ChevronDown/></summary><p>{item.reason}</p></details><button className="not-for-me" onClick={()=>skip(item.id,item.category)}><SlidersHorizontal/> Not for me</button></article>)}</div>}

@@ -1,0 +1,592 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String               @id @default(cuid())
+  email           String               @unique
+  passwordHash    String
+  role            String               @default("USER")
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  profile         Profile?
+  sessions        Session[]
+  guardian        GuardianApproval[]
+  goals           Goal[]
+  progress        LearningProgress[]
+  achievements    UserAchievement[]
+  activities      Activity[]
+  simulations     SimulatorSession[]
+  simulationRuns  SimulationRun[]
+  avatar          UserAvatar?
+  missionProgress MissionProgress[]
+  reflections     PracticeReflection[]
+  decisionSessions DecisionSession[]
+  videoProgress   VideoProgress[]
+  createdVideos   Video[]              @relation("VideoCreator")
+  passwordResets  PasswordResetToken[]
+  rewards         RewardLedger[]
+  sparkCoinEvents SparkCoinEvent[]
+  conceptUnlocks  ConceptUnlock[]
+  labProgress     WeeklyLabProgress[]
+  dailyPostProgress DailyPostProgress[]
+  portfolioRuns   PortfolioRun[]
+}
+
+model Profile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  firstName          String
+  age                Int?
+  ageGroup           String?
+  contentLevel       String?
+  guardianStatus     String   @default("NOT_REQUIRED")
+  streak             Int      @default(0)
+  xp                 Int      @default(0)
+  currentTopic       String   @default("Getting started")
+  beginnerDone       Int      @default(0)
+  advancedSkips      Int      @default(0)
+  notifications      Boolean  @default(true)
+  sprigSounds        Boolean  @default(false)
+  privacyMode        String   @default("STANDARD")
+  interests          String   @default("[]")
+  confidenceBaseline Int?
+  demoDay            String   @default("MONDAY")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Server-authoritative educational currency ledger. A source can reward or spend once.
+model SparkCoinEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  sourceType String
+  sourceId   String
+  amount     Int
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sourceType, sourceId])
+  @@index([userId, createdAt])
+}
+
+model ConceptUnlock {
+  id         String   @id @default(cuid())
+  userId     String
+  concept    String
+  sourceType String
+  sourceId   String
+  unlockedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, concept])
+  @@index([userId, unlockedAt])
+}
+
+/// Reviewed, age-bounded curriculum material available to Sprout's read-only tutor.
+model KnowledgeChunk {
+  id          String   @id
+  title       String
+  sourceLabel String
+  topic       String
+  ageMin      Int
+  ageMax      Int
+  level       Int
+  reviewedAt  DateTime
+  body        String
+  isDraft     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([topic, ageMin, ageMax, level])
+  @@index([reviewedAt])
+}
+
+model WeeklyLab {
+  id          String              @id @default(cuid())
+  slug        String              @unique
+  title       String
+  concept     String
+  summary     String
+  ageGroup    String              @default("ALL")
+  rewardCoins Int                 @default(100)
+  published   Boolean             @default(false)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  progress    WeeklyLabProgress[]
+  dailyPosts  DailyPost[]
+}
+
+model WeeklyLabProgress {
+  id          String    @id @default(cuid())
+  userId      String
+  labId       String
+  step        Int       @default(0)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lab         WeeklyLab @relation(fields: [labId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, labId])
+  @@index([userId, completedAt])
+}
+
+model DailyPost {
+  id          String              @id @default(cuid())
+  slug        String              @unique
+  labId       String
+  dayLabel    String              @default("WEDNESDAY")
+  title       String
+  prompt      String
+  options     String
+  feedback    String
+  rewardCoins Int                 @default(25)
+  published   Boolean             @default(false)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  lab         WeeklyLab           @relation(fields: [labId], references: [id], onDelete: Cascade)
+  progress    DailyPostProgress[]
+
+  @@index([labId, dayLabel, published])
+}
+
+model DailyPostProgress {
+  id          String    @id @default(cuid())
+  userId      String
+  postId      String
+  choice      String
+  feedback    String
+  completedAt DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post        DailyPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([userId, completedAt])
+}
+
+/// Cached historical series used by the demo. React never fetches market data directly.
+model MarketSnapshot {
+  id            String          @id @default(cuid())
+  key           String          @unique
+  symbol        String
+  label         String
+  sector        String?
+  source        String
+  sourceUrl     String
+  startDate     DateTime
+  endDate       DateTime
+  asOfDate      DateTime
+  retrievedAt   DateTime
+  dataVersion   String
+  pricePoints   String
+  annualisedVolatility Float
+  marketCapMillions Int?
+  revenueTrend  String?
+  createdAt     DateTime        @default(now())
+  portfolioRuns PortfolioRun[]
+
+  @@index([sector, asOfDate])
+  @@index([annualisedVolatility])
+}
+
+model PortfolioRun {
+  id                 String                @id @default(cuid())
+  userId             String
+  level              Int
+  path                String
+  allocatedCoins     Int
+  snapshotId         String
+  startPoint         Int
+  decisionPoint      Int
+  endPoint           Int
+  decision           String?
+  selectedOutcome    Int?
+  alternativeOutcome Int?
+  status              String               @default("AWAITING_DECISION")
+  createdAt           DateTime             @default(now())
+  completedAt         DateTime?
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapshot            MarketSnapshot       @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
+  allocations         PortfolioAllocation[]
+  decisions           PortfolioDecision[]
+
+  @@index([userId, createdAt])
+  @@index([userId, level, status])
+}
+
+model PortfolioAllocation {
+  id        String       @id @default(cuid())
+  runId     String
+  assetKey  String
+  amount    Int
+  run       PortfolioRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, assetKey])
+}
+
+model PortfolioDecision {
+  id        String       @id @default(cuid())
+  runId     String
+  decision  String
+  createdAt DateTime     @default(now())
+  run       PortfolioRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId])
+}
+
+model UserAvatar {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  character     String   @default("SPRIG")
+  colourVariant String   @default("MINT")
+  accessory     String   @default("NONE")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model GuardianApproval {
+  id            String    @id @default(cuid())
+  userId        String
+  guardianName  String
+  guardianEmail String
+  tokenHash     String?   @unique
+  status        String    @default("PENDING")
+  expiresAt     DateTime
+  approvedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([expiresAt])
+}
+
+model Goal {
+  id            String             @id @default(cuid())
+  userId        String
+  title         String
+  targetPence   Int
+  savedPence    Int                @default(0)
+  status        String             @default("ACTIVE")
+  targetDate    DateTime?
+  category      String             @default("Other")
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contributions GoalContribution[]
+
+  @@index([userId, status])
+}
+
+model GoalContribution {
+  id          String   @id @default(cuid())
+  goalId      String
+  amountPence Int
+  createdAt   DateTime @default(now())
+  goal        Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId, createdAt])
+}
+
+model LearningModule {
+  id          String             @id @default(cuid())
+  slug        String             @unique
+  title       String
+  description String
+  path        String             @default("Money Basics")
+  objective   String             @default("")
+  difficulty  String             @default("Beginner")
+  minutes     Int                @default(3)
+  ageGroup    String
+  content     String
+  xpReward    Int                @default(50)
+  published   Boolean            @default(false)
+  sortOrder   Int                @default(0)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  progress    LearningProgress[]
+}
+
+model LearningProgress {
+  id          String         @id @default(cuid())
+  userId      String
+  moduleId    String
+  status      String         @default("NOT_STARTED")
+  progress    Int            @default(0)
+  completedAt DateTime?
+  updatedAt   DateTime       @updatedAt
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module      LearningModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, moduleId])
+  @@index([userId, status])
+}
+
+model Video {
+  id              String          @id @default(cuid())
+  title           String
+  description     String
+  sourceUrl       String
+  storageKey      String?
+  thumbnailUrl    String?
+  category        String
+  ageGroup        String
+  difficulty      String          @default("Beginner")
+  durationSeconds Int             @default(120)
+  transcript      String
+  keyTakeaway     String
+  published       Boolean         @default(false)
+  fileSize        Int?
+  mimeType        String?
+  createdById     String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  progress        VideoProgress[]
+  createdBy       User?           @relation("VideoCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([createdById])
+  @@index([ageGroup, published])
+}
+
+model VideoProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  videoId     String
+  completedAt DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video       Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, videoId])
+  @@index([userId, completedAt])
+}
+
+model FeedItem {
+  id          String    @id @default(cuid())
+  title       String
+  summary     String
+  category    String
+  ageGroup    String
+  reason      String
+  actionPath  String
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([ageGroup, publishedAt])
+}
+
+model WireStory {
+  id              String    @id @default(cuid())
+  slug            String    @unique
+  title           String
+  summary         String
+  ageGroup        String
+  category        String    @default("Money explained")
+  whatHappened    String
+  whyItMatters    String
+  whatCouldAffect String
+  keyTerm         String
+  learnMorePath   String?
+  minutes         Int       @default(3)
+  publishedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([ageGroup, publishedAt])
+}
+
+model Achievement {
+  id          String            @id @default(cuid())
+  key         String            @unique
+  title       String
+  description String
+  icon        String
+  createdAt   DateTime          @default(now())
+  users       UserAchievement[]
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  achievementId String
+  earnedAt      DateTime    @default(now())
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId, earnedAt])
+}
+
+/// Server-authoritative, idempotent record of educational XP awards.
+model RewardLedger {
+  id         String   @id @default(cuid())
+  userId     String
+  sourceType String
+  sourceId   String
+  amount     Int
+  metadata   String?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sourceType, sourceId])
+  @@index([userId, createdAt])
+  @@index([sourceType, sourceId])
+}
+
+/// Optional evidence metadata. Demonstration notes are explicitly labelled and are not research citations.
+model EvidenceSource {
+  id              String    @id @default(cuid())
+  sourceTitle     String
+  publisher       String
+  publicationYear Int?
+  sourceUrl       String?
+  reviewedAt      DateTime?
+  topic           String
+  isDemo          Boolean   @default(false)
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([topic, reviewedAt])
+  @@index([publisher])
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  metadata  String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model SimulatorSession {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  inputs    String
+  results   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model SimulationRun {
+  id            String   @id @default(cuid())
+  userId        String
+  scenarioId    String
+  startingValue Int      @default(1000000)
+  endingValue   Int
+  allocation    String
+  duration      String
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([scenarioId])
+}
+
+model Mission {
+  id          String            @id @default(cuid())
+  slug        String            @unique
+  title       String
+  description String
+  purpose     String
+  ageGroup    String
+  xpReward    Int               @default(50)
+  actionPath  String
+  sortOrder   Int               @default(0)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  progress    MissionProgress[]
+
+  @@index([ageGroup, sortOrder])
+}
+
+model MissionProgress {
+  id          String    @id @default(cuid())
+  userId      String
+  missionId   String
+  status      String    @default("IN_PROGRESS")
+  progress    Int       @default(0)
+  xpAwarded   Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mission     Mission   @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, missionId])
+  @@index([userId, status])
+}
+
+model PracticeReflection {
+  id                String           @id @default(cuid())
+  userId            String
+  activityKey       String
+  choice            String
+  decisionSessionId String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  decisionSession   DecisionSession? @relation(fields: [decisionSessionId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, activityKey])
+  @@index([userId, createdAt])
+  @@index([decisionSessionId])
+}
+
+/// Server-owned history for the reusable Learn → Decide → Consequence → Explain → Reflect → Progress loop.
+/// Decisions and outcomes are JSON snapshots so scenario definitions can evolve without rewriting history.
+model DecisionSession {
+  id           String               @id @default(cuid())
+  userId       String
+  topic        String
+  scenarioKey  String
+  ageGroup     String
+  decisions    String
+  outcome      String
+  explanation  String
+  createdAt    DateTime             @default(now())
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reflections  PracticeReflection[]
+
+  @@index([userId, createdAt])
+  @@index([userId, topic, createdAt])
+}

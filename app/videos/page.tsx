@@ -1,0 +1,9 @@
+import Link from "next/link";
+import { ArrowLeft, ArrowRight, Check, Clock3, Play, Video } from "lucide-react";
+import { Brand } from "@/components/brand";
+import { AppShell } from "@/components/app-shell";
+import { requireUser } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { redirect } from "next/navigation";
+import Image from "next/image";
+export default async function VideosPage(){const user=await requireUser();const profile=user.profile;if(!profile?.ageGroup)redirect("/onboarding");const videos=await db.video.findMany({where:{ageGroup:profile.ageGroup,published:true},include:{progress:{where:{userId:user.id}}},orderBy:{createdAt:"desc"}});return <main className={`product-page ${profile.ageGroup==="YOUTH"?"youth-surface":"adult-surface"}`}><AppShell className="inner-shell" mode={profile.ageGroup as "YOUTH"|"YOUNG_ADULT"} active="Learn"><header className="inner-header"><Link href="/dashboard" className="icon-button" aria-label="Back to home"><ArrowLeft/></Link><Brand/><span className="xp-pill">{profile.xp} XP</span></header><section className="page-title-row video-heading"><div><span className="page-kicker"><Video/> Watch & learn</span><h1>Money, made visual</h1><p>Short educational videos with a written alternative every time.</p></div></section><div className="video-grid">{videos.map((video,index)=><Link href={`/videos/${video.id}`} key={video.id} className="video-card"><div className={`video-thumb tone-${index%4}`}>{video.thumbnailUrl?<Image src={video.thumbnailUrl} alt="" width={350} height={138} unoptimized/>:<Video/>}<i><Play/></i>{video.progress.length>0&&<span><Check/> Watched</span>}</div><small>{video.category.toUpperCase()}</small><h2>{video.title}</h2><p>{video.description}</p><footer><span><Clock3/> {Math.ceil(video.durationSeconds/60)} min</span><span>{video.difficulty}</span><ArrowRight/></footer></Link>)}</div></AppShell></main>}

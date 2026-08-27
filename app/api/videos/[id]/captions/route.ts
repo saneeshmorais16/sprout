@@ -1,0 +1,4 @@
+import { currentUser } from "@/lib/auth";
+import { db } from "@/lib/db";
+type RouteContext={params:Promise<{id:string}>};
+export async function GET(_:Request,{params}:RouteContext){const user=await currentUser();if(!user?.profile?.ageGroup)return new Response("Not found",{status:404});const{id}=await params;const video=await db.video.findFirst({where:{id,ageGroup:user.profile.ageGroup,published:true}});if(!video)return new Response("Not found",{status:404});const end=Math.max(10,video.durationSeconds);const minutes=Math.floor(end/60).toString().padStart(2,"0");const seconds=(end%60).toString().padStart(2,"0");const text=video.transcript.replace(/-->/g,"→").replace(/\r?\n/g," ");return new Response(`WEBVTT\n\n00:00:00.000 --> 00:${minutes}:${seconds}.000\n${text}\n`,{headers:{"Content-Type":"text/vtt; charset=utf-8","Cache-Control":"private, max-age=3600"}})}

@@ -1,0 +1,9 @@
+export type PortfolioKey = "STEADY" | "BALANCED" | "GROWTH";
+export type SimulationInputs = { monthlyContribution:number; years:number; startingAge:number; portfolio:PortfolioKey };
+export const portfolioOptions:Record<PortfolioKey,{label:string;youthLabel:string;rate:number;description:string}>={
+  STEADY:{label:"Steadier diversified mix",youthLabel:"Steady explorer",rate:.04,description:"A lower-growth illustration with a narrower range."},
+  BALANCED:{label:"Diversified index-style simulation",youthLabel:"Balanced explorer",rate:.055,description:"A fictional diversified middle path—not a real fund."},
+  GROWTH:{label:"Growth-focused diversified mix",youthLabel:"Growth explorer",rate:.07,description:"A wider range with more uncertainty along the way."},
+};
+function futureValue(monthly:number,years:number,annualRate:number){const months=years*12;const rate=annualRate/12;if(rate===0)return monthly*months;return monthly*((Math.pow(1+rate,months)-1)/rate);}
+export function projectSimulation(inputs:SimulationInputs){const expectedRate=portfolioOptions[inputs.portfolio].rate;const rows=Array.from({length:inputs.years+1},(_,year)=>{const contributed=inputs.monthlyContribution*12*year;const expected=futureValue(inputs.monthlyContribution,year,expectedRate);const low=futureValue(inputs.monthlyContribution,year,Math.max(.005,expectedRate-.035));const high=futureValue(inputs.monthlyContribution,year,expectedRate+.035);return {year,age:inputs.startingAge+year,contributed:Math.round(contributed),expected:Math.round(expected),low:Math.round(low),high:Math.round(high),range:[Math.round(low),Math.round(high)]};});const final=rows[rows.length-1];const inflationAdjusted=Math.round(final.expected/Math.pow(1.025,inputs.years));return {rows,final:{...final,growth:Math.max(0,final.expected-final.contributed),inflationAdjusted},assumptions:{expectedRate,inflationRate:.025}};}
